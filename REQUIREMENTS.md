@@ -4,9 +4,9 @@ updated: 2026-07-23
 status: draft
 ---
 
-# SwiftCharacturas — Requirements
+# SwiftSemblanzas — Requirements
 
-**Character-consistent storyboard generation on Apple Silicon.** SwiftCharacturas
+**Character-consistent storyboard generation on Apple Silicon.** SwiftSemblanzas
 turns a small set of source photos (± a prompt) into a *reusable trained
 character identity*, then renders short, coherent storyboard **sequences** in
 which that character stays recognizably the same across panels.
@@ -20,7 +20,7 @@ Library + CLI first; GUI later.
 
 A storyboard is only a storyboard if the panels look like *one* story — the same
 character, prop, and location recur across frames. Text prompts alone drift:
-ask FLUX for "a man" four times and you get four different men. SwiftCharacturas
+ask FLUX for "a man" four times and you get four different men. SwiftSemblanzas
 makes recurring visual entities **first-class, trained, reusable assets**.
 
 The ecosystem already has the pieces this depends on:
@@ -34,7 +34,7 @@ The ecosystem already has the pieces this depends on:
 - **SwiftAcervo** — shared model discovery/download/cache (App Group
   `group.intrusive-memory.models`).
 
-SwiftCharacturas is the dedicated home for the **character-identity lifecycle**
+SwiftSemblanzas is the dedicated home for the **character-identity lifecycle**
 that Vinetas started but left stubbed (`CharacterTrainer.train()` currently
 throws `"LoRA training not yet available"`).
 
@@ -105,7 +105,7 @@ produces blended, unrecognizable output.
   regenerated automatically (bounded retries; log when the cap is hit — no
   silent truncation).
 - **F7 — CLI surface.** Every Phase-1 capability reachable from a
-  `characturas` CLI (`train`, `sequence`, at minimum) with no GUI dependency.
+  `semblanzas` CLI (`train`, `sequence`, at minimum) with no GUI dependency.
 
 ### 3.2 Explicit non-goals for Phase 1
 
@@ -205,7 +205,7 @@ pointers in SwiftData.
 
 ## 8. Open questions / decisions to make before coding
 
-1. **Vinetas relationship.** Does SwiftCharacturas *depend on* SwiftVinetas
+1. **Vinetas relationship.** Does SwiftSemblanzas *depend on* SwiftVinetas
    (reusing `CharacterManager` + Understanding), *replace* its character layer,
    or depend directly on `Flux2Core` and lift only DINOv2? Recommendation:
    depend on `Flux2Core` directly for train/infer; reuse Vinetas' Understanding

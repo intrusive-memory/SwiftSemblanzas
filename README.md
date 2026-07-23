@@ -4,7 +4,7 @@ updated: 2026-07-23
 status: pre-alpha
 ---
 
-# SwiftCharacturas
+# SwiftSemblanzas
 
 **Character-consistent storyboards on Apple Silicon.** Turn a handful of source
 photos into a reusable, trained character identity — then render short
@@ -12,7 +12,7 @@ storyboard **sequences** in which that character stays recognizably the same
 from panel to panel.
 
 Part of the [intrusive-memory](https://github.com/intrusive-memory) ecosystem.
-Ships as a Swift **library** and a `characturas` **CLI** first; a GUI comes
+Ships as a Swift **library** and a `semblanzas` **CLI** first; a GUI comes
 later.
 
 > **Status: pre-alpha / design.** This repo currently contains the design docs
@@ -22,7 +22,7 @@ later.
 ## Why
 
 Text prompts drift — ask FLUX for "a man" four times and you get four different
-men. A storyboard needs the *same* character across frames. SwiftCharacturas
+men. A storyboard needs the *same* character across frames. SwiftSemblanzas
 makes recurring visual entities (characters first; props and locations later)
 **first-class, trained, reusable assets**, built on the ecosystem's existing
 FLUX.2 / MLX training and inference stack.

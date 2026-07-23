@@ -3,7 +3,7 @@ type: reference
 updated: 2026-07-23
 ---
 
-# Claude-Specific Agent Instructions — SwiftCharacturas
+# Claude-Specific Agent Instructions — SwiftSemblanzas
 
 **Read [REQUIREMENTS.md](REQUIREMENTS.md) first** — it holds the vision, the
 non-negotiable design invariants (§2), the Phase-1 scope, and the data model.
@@ -15,7 +15,7 @@ this file as authoritative.
 
 ## 1. What this project is
 
-A Swift **library + `characturas` CLI** that trains reusable per-character
+A Swift **library + `semblanzas` CLI** that trains reusable per-character
 FLUX.2 LoRAs from photos and renders character-consistent storyboard sequences,
 on-device via MLX. Library and CLI come first; GUI is deferred. Do not add GUI
 code until the library + CLI are proven and tested.
