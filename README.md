@@ -12,8 +12,8 @@ storyboard **sequences** in which that character stays recognizably the same
 from panel to panel.
 
 Part of the [intrusive-memory](https://github.com/intrusive-memory) ecosystem.
-Ships as a Swift **library** and a `semblanzas` **CLI** first; a GUI comes
-later.
+Ships as a Swift **library** and a `semblanzas` **CLI**. The GUI is
+**Personaje** (`apps/Personaje`), the app layer built on this library.
 
 > **Status: pre-alpha / design.** This repo currently contains the design docs
 > ([REQUIREMENTS.md](REQUIREMENTS.md)) only. Implementation begins with Phase 1
@@ -29,7 +29,8 @@ FLUX.2 / MLX training and inference stack.
 
 ## How it works (the short version)
 
-1. **Intake** a character from a SwiftData store: source photo(s) ± a prompt.
+1. **Intake** a character from the production's cast list (`CAST.md`, owned by
+   **SwiftReparto**): source photo(s) ± a prompt.
 2. **Train** a per-character subject **LoRA** (trigger word + DOP
    regularization) once, against FLUX.2 Base weights, entirely on-device.
    The trained adapter is a durable, reusable asset.
@@ -57,10 +58,16 @@ Two ideas do the heavy lifting, and they're worth stating plainly:
 | **2** | Multi-character scenes ("Dan and Rick talk") |
 | **3** | Props (incl. 3D-model → training data) |
 | **4** | Locations |
-| later | GUI |
+| — | GUI: **Personaje** (`apps/Personaje`) is the app layer |
 
 ## Built on
 
+- **[SwiftReparto](https://github.com/intrusive-memory/SwiftReparto)** — the cast
+  list (`CAST.md`). Where characters come from, and the only writer of that file.
+  Each member's `manifest:` points at `characters/<CHARACTER>/manifest.json`, the
+  character record this package defines (see REQUIREMENTS §5). Its sibling consumer, **SwiftEchada**,
+  does the same thing for voice — same roster, different assets, neither aware
+  of the other.
 - **[flux-2-swift-mlx](https://github.com/intrusive-memory/flux-2-swift-mlx)**
   (`Flux2Core`) — on-device FLUX.2 LoRA training + inference.
 - **SwiftAcervo** — shared model discovery / download / cache.
