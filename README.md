@@ -64,8 +64,9 @@ Two ideas do the heavy lifting, and they're worth stating plainly:
 
 - **[SwiftReparto](https://github.com/intrusive-memory/SwiftReparto)** — the cast
   list (`CAST.md`). Where characters come from, and the only writer of that file.
-  Each member's `manifest:` points at `characters/<CHARACTER>/manifest.json`, the
-  character record this package defines (see REQUIREMENTS §5). Its sibling consumer, **SwiftEchada**,
+  Each member's `manifest:` points at `characters/<CHARACTER>.dossier/manifest.json`,
+  the character's `.dossier` bundle ([dossier-format](https://github.com/intrusive-memory/dossier-format),
+  implemented by SwiftDossier). Its sibling consumer, **SwiftEchada**,
   does the same thing for voice — same roster, different assets, neither aware
   of the other.
 - **[flux-2-swift-mlx](https://github.com/intrusive-memory/flux-2-swift-mlx)**

@@ -1,23 +1,22 @@
 ---
 type: requirements
-updated: 2026-09-25
+updated: 2026-10-19
 status: draft
 ---
 
 # SwiftSemblanzas — Requirements
 
-SwiftSemblanzas has two jobs:
-
-1. **The character record (§5)** is the one shared definition of what a
-   character *is* on disk. It covers the naming rule, how a character is
-   found through `CAST.md`, the per-character `manifest.json`, `CHARACTER.md`,
-   the asset kinds each role tier needs, and the `dossier.html` that presents
-   it all. Every app that reads or writes character assets does so through
-   this library: Personaje, Produciesta, Vinetas and SwiftEchada's tooling.
-2. **Character-consistent image generation on Apple Silicon (§3).** It turns
+SwiftSemblanzas does one job: **character-consistent image generation on
+Apple Silicon (§3).** It turns
    a small set of source photos (± a prompt) into a *reusable trained
    character identity*, then renders short, coherent storyboard **sequences**
    in which that character stays recognizably the same across panels.
+
+The **character record** it trains from and writes its adapter into is the
+`.dossier` bundle, defined by
+[dossier-format](https://github.com/intrusive-memory/dossier-format)
+(`docs/DOSSIER-FORMAT.md`) and implemented by **SwiftDossier**. It used to be
+specified here as §5; that text moved out on 2026-10-19 (§5 is now a pointer).
 
 **Personaje** (`apps/Personaje`) is the app layer on top of this library: the
 macOS app and `personaje` CLI that walk a user through creating a character's
@@ -92,7 +91,7 @@ produces blended, unrecognizable output.
 
 ### 3.1 Functional requirements
 
-- **F1 — Character intake.** Read a character's record (§5): its `CAST.md`
+- **F1 — Character intake.** Read a character's record (dossier-format): its `CAST.md`
   entry, manifest, `sourcePhoto` assets and `CHARACTER.md` description. The
   SwiftData catalog (§4.1) is populated from the record, never the other way
   round.
@@ -184,17 +183,17 @@ and SwiftEchada consume.
 
 - **`CAST.md` is canonical.** A character exists because it is in the cast list.
 - **The SwiftData catalog is a derived index**, keyed by the character's
-  canonical UPPERCASE name (§5.1) and rebuildable from `CAST.md` plus the
+  canonical UPPERCASE name (dossier-format) and rebuildable from `CAST.md` plus the
   manifests. It holds the training-asset metadata
   (`TrainingImage`, `LoRAAsset`) that has no business in a git-tracked markdown
   file, and nothing else that `CAST.md` already states.
 - **Write-back goes through SwiftReparto.** Anything that must land in
-  `CAST.md` (the member's `manifest:` pointer, §5.2) is written by handing a
+  `CAST.md` (the member's `manifest:` pointer, dossier-format §3) is written by handing a
   mutated `CastDocument` back to `CastMarkdownParser`. This package never
   serializes `CAST.md` itself; see SwiftReparto `RQ-INV-2` (one writer).
 - **Trained adapters are recorded in the manifest**, not in `CAST.md`: the
   `.safetensors` is a `lora` asset with its trigger word in the asset entry
-  (§5.3). This supersedes the earlier plan to write `appearance.lora` /
+  (dossier-format). This supersedes the earlier plan to write `appearance.lora` /
   `appearance.triggerWord`. **`appearance` is deprecated** (SwiftReparto
   RQ-25, decided 2026-09-25).
 
@@ -204,16 +203,22 @@ changes stay reviewable in a PR diff.
 
 ### 4.4 On-disk layout
 
-The character directory is defined by the character record (§5.2):
-`characters/<CHARACTER>/`, where `<CHARACTER>` is the exact UPPERCASE
-screenplay name. Training work uses subdirectories inside it:
+The character directory is the `.dossier` bundle (dossier-format §3, §4):
+`characters/<CHARACTER>.dossier/`, where `<CHARACTER>` is the exact UPPERCASE
+screenplay name. `characters/<CHARACTER>/` with no extension is an error.
+Training work uses subdirectories inside it:
 
 ```
-characters/THE PRACTITIONER/
-  manifest.json  CHARACTER.md  dossier.html      # §5
-  images/        voice/                          # §5.4 asset kinds
-  source/        references/   training/   lora/ # this section
+characters/THE PRACTITIONER.dossier/
+  manifest.json  CHARACTER.md  THE PRACTITIONER-dossier.html   # dossier-format
+  images/        voice/                                        # dossier-format §8
+  source/        references/   training/   lora/               # this section
 ```
+
+The adapter is `lora/<CHARACTER>-v<N>.safetensors`, registered as a `lora`
+asset with `lora.triggerWord` (dossier-format §8.4); training images are
+`training` assets with `{caption, view, isSynthetic}`. SwiftSemblanzas writes
+them through SwiftDossier's `Dossier` API, never by editing `manifest.json`.
 
 Heavy bytes live here, pointers live in SwiftData, and every file that
 counts is listed in the manifest. This **replaces** the earlier plan to reuse
@@ -223,360 +228,24 @@ a production.
 
 ---
 
-## 5. The character record (shared contract)
+## 5. The character record (moved)
 
-This section is the contract every app uses to read and write characters. It
-has no dependency on MLX or FLUX. It ships as its own Foundation-only library
-target (§5.8), so any app can read characters without linking the training
-stack.
+Moved to [dossier-format](https://github.com/intrusive-memory/dossier-format)
+on 2026-10-19 (SM-P2): names, discovery, the manifest, asset kinds and tiers,
+CHARACTER.md, the dossier page and validation are `docs/DOSSIER-FORMAT.md`
+there, with JSON Schemas and `data/tiers.json`. The Swift reader, writer and
+renderer are **SwiftDossier**. The text that stood here is version 1 of the
+format (dossier-format Appendix A) and is in this file's history at
+`739720b`.
 
-### 5.1 Names: exactly the screenplay's, in UPPERCASE
+What SwiftSemblanzas needs from the record:
 
-A dramatic character has **one name**, the one its screenplay cue uses, in
-uppercase. It's written identically everywhere: in the screenplay, as the
-`CAST.md` `character:` value, as the directory name, as the manifest's
-`character`, as the `CHARACTER.md` `character:` value, in file names that
-carry the name (`voice/THE PRACTITIONER.vox`), and in CLI arguments. There
-are **no slugs** and no lowercase or derived forms.
-
-Canonicalization is **implemented in SwiftReparto** as `CastMember.canonicalName(_:)`
-(SwiftReparto REQUIREMENTS RQ-22), so every consumer shares one implementation,
-including SwiftEchada, which doesn't link this package. It's applied to every
-name read from a screenplay, typed in, or found in `CAST.md`:
-
-1. Strip cue extensions: `(V.O.)`, `(O.S.)`, `(O.C.)`, `(CONT'D)`, and any
-   other trailing parenthetical. `NARRATOR (V.O.)` becomes `NARRATOR`. The
-   Fountain `@` force-marker is also removed.
-2. Trim, and collapse runs of whitespace to one space.
-3. Uppercase, because Fountain allows mixed case after `@`: `@McCLANE`
-   becomes `MCCLANE`.
-4. Keep everything else: punctuation, digits and accents. `DR. O'NEILL`,
-   `GUARD #2` and `JOSÉ` are all valid. Store names in Unicode **NFC**.
-5. A name containing `/` or `:`, or starting with `.`, is an **error** to be
-   fixed in the screenplay. There is never silent substitution, because a
-   substituted name wouldn't be the screenplay's name.
-
-Since only uppercase forms are created, case-insensitive APFS collisions
-(`NARRATOR/` vs `narrator/`) can't arise. Writers refuse to create a
-directory that differs from an existing one only by case. Names contain
-spaces, so every path consumer must quote or percent-encode.
-
-### 5.2 Discovery: CAST.md → manifest
-
-**Discovery always starts at `CAST.md`.** Each member that has assets
-carries an explicit `manifest:` path, relative to the directory holding
-`CAST.md`:
-
-```yaml
----
-type: cast
-cast:
-  - character: THE PRACTITIONER
-    role: supporting
-    manifest: "characters/THE PRACTITIONER/manifest.json"
-    voicePrompt: "…"
-    voices:
-      voxalta:
-        - "characters/THE PRACTITIONER/voice/THE PRACTITIONER.vox"
-  - character: GUARD #2
-    role: background            # no assets, so no manifest
----
-```
-
-Invariants, enforced on read by `CharacterRecord` and on write by the
-manifest writer:
-
-- **The manifest's parent directory name equals `character` exactly.**
-  `characters/THE PRACTITIONER/manifest.json` is valid for
-  `THE PRACTITIONER`, and `characters/practitioner/…` is an error. The
-  grandparent (`characters/`) is a convention, not a rule.
-- **The manifest's `character` field equals the CAST.md `character`.** On a
-  mismatch the record doesn't load, and the error names both values.
-- **A member without `manifest:` has no assets.** That's valid for
-  background roles. Nothing is found by scanning directories: a
-  `characters/X/` folder with no CAST.md member pointing at it is an
-  **orphan**. It's reported, never loaded, and never deleted.
-- **Adoption.** `manifest refresh` is the one exception to the scanning rule.
-  If an orphan folder's name exactly equals a member that has no `manifest:`
-  (e.g. a folder SwiftEchada created for a new voice, per SwiftEchada EC-23
-  rule 3), refresh creates the manifest and sets the pointer through
-  Reparto. Refresh never adopts a folder that doesn't match a name exactly.
-- The pointer is written through SwiftReparto (§4.3). `manifest` and `role`
-  become first-class `CastMember` fields in **SwiftReparto 0.2.0** (its
-  REQUIREMENTS RQ-19 to RQ-21, drafted). Until that ships they're carried as
-  `extraKeys`, which Reparto already round-trips.
-
-### 5.3 The manifest
-
-`manifest.json` inventories the character directory. It **follows
-SwiftAcervo's `CDNManifest`**, so integrity rules are identical across the
-suite.
-
-```json
-{
-  "manifestVersion": 1,
-  "character": "THE PRACTITIONER",
-  "role": "supporting",
-  "updatedAt": "2026-09-25T18:04:00Z",
-  "generator": { "name": "personaje", "version": "1.0.0" },
-  "files": [
-    { "path": "CHARACTER.md",                    "sha256": "…", "sizeBytes": 4120 },
-    { "path": "images/turnaround-3f2a.png",      "sha256": "…", "sizeBytes": 2210034 },
-    { "path": "lora/THE PRACTITIONER-v2.safetensors", "sha256": "…", "sizeBytes": 38011904 },
-    { "path": "voice/THE PRACTITIONER.vox",      "sha256": "…", "sizeBytes": 88211 },
-    { "path": "voice/sample-neutral.m4a",        "sha256": "…", "sizeBytes": 190442 }
-  ],
-  "assets": [
-    {
-      "path": "images/turnaround-3f2a.png",
-      "kind": "turnaround",
-      "status": "selected",
-      "label": "Turnaround, overcoat",
-      "createdAt": "2026-09-25T17:40:12Z",
-      "provenance": {
-        "provider": "openai", "model": "gpt-image-1",
-        "prompt": "Character turnaround reference sheet of …",
-        "references": ["source/01.jpg"], "seed": null
-      },
-      "review": { "passed": ["allAnglesPresent", "consistentDesign"], "notes": "" }
-    },
-    {
-      "path": "lora/THE PRACTITIONER-v2.safetensors",
-      "kind": "lora",
-      "status": "selected",
-      "lora": { "triggerWord": "prctnr_v2", "rank": 16, "steps": 1500,
-                "defaultScale": 0.8, "baseModel": "klein4B_base_bf16" }
-    },
-    {
-      "path": "voice/sample-neutral.m4a",
-      "kind": "voiceSample",
-      "status": "selected",
-      "variant": "neutral",
-      "derivedFrom": "voice/THE PRACTITIONER.vox",
-      "sampleText": "…"
-    }
-  ],
-  "manifestChecksum": "…"
-}
-```
-
-**There are two layers.**
-
-- **`files`** has *exactly* Acervo's `CDNManifestFile` shape: `path`,
-  `sha256` and `sizeBytes`, all required, nothing else. Acervo's rules apply
-  unchanged:
-  - Paths are relative to the manifest's directory. A leading `/` is
-    stripped, and empty, `.` and `..` segments are rejected.
-  - Files are sorted by `path`.
-  - `manifestChecksum` is the SHA-256 of the **sorted `sha256` strings**
-    joined together. Follow Acervo's code (`CDNManifest.swift:263`), not its
-    prose.
-  - Zero-byte files are refused.
-  - The scan skips `manifest.json`, hidden files, `.DS_Store`, symlinks and
-    non-regular files.
-  - Writes are atomic, `.prettyPrinted` + `.sortedKeys`, and are re-read and
-    verified after writing.
-- **`assets`** is the semantic layer, keyed by `path`. Each entry records
-  `kind`, `status`, `variant`, `label`, `provenance`, `review`, and
-  kind-specific data (`lora`, `derivedFrom`, `sampleText`). Every asset has
-  a `files` entry. A file without an asset entry is **unclassified**, which
-  is allowed and gets reported.
-
-| Top-level field | Required | Notes |
-|-----------------|:--------:|-------|
-| `manifestVersion` | ✅ | Int, currently `1`. Unknown versions are rejected, as in Acervo. |
-| `character` | ✅ | The canonical name (§5.1). It must equal both the directory name and the CAST.md member. |
-| `role` | — | A copy of the CAST.md tier. CAST.md wins on conflict. |
-| `updatedAt` | ✅ | ISO-8601, `.withInternetDateTime`. |
-| `generator` | — | Name and version of the writing tool. Acervo has no equivalent. |
-| `files` | ✅ | Acervo shape. |
-| `assets` | ✅ | May be empty. |
-| `manifestChecksum` | ✅ | Acervo algorithm. |
-
-**`status`**: `selected` counts toward completeness, and there is at most one
-per `kind` + `variant`. The others are `candidate` and `rejected`. Rejected
-files are kept until explicitly pruned.
-
-**Who registers what.** Tools that create files register them through the
-manifest writer: Personaje for images and samples, this package for `lora`
-and `training`. SwiftEchada is **not** required to link SwiftSemblanzas. A
-`.vox` written by `echada` shows up as an unclassified file, and the next
-Personaje or `semblanzas manifest refresh` run adopts it as `kind: vox`.
-
-### 5.4 Asset kinds and role tiers
-
-**Where the tiers come from.** SAG-AFTRA contracts formally distinguish
-**principal performers** from **background actors**, and have an
-**under-five** category (five lines or fewer) and voice-over categories.
-Lead, supporting, guest star and co-star are the industry's casting and
-billing tiers built on that split. `role:` in CAST.md takes one of:
-
-| `role` | Basis | Meaning |
-|--------|-------|---------|
-| `lead` | Principal, series regular | Carries the story |
-| `supporting` | Principal, series regular / recurring | Significant arc, recurs |
-| `guest` | Principal, single-episode featured | Major within one episode |
-| `narrator` | Voice-over principal | Voice only |
-| `costar` | Principal, day performer | A few scenes, functional role |
-| `underfive` | Under-five performer | ≤ 5 lines |
-| `background` | Background actor | No lines, or walla only |
-
-**Major** = `lead`, `supporting`, `guest`, `narrator`. This matches the
-CAST.md body's planned Major/Minor sections (Reparto RQ-8). A tier can be
-*suggested* from screenplay line and episode counts, but it's never applied
-without confirmation.
-
-**Required assets.** ✅ required · ◐ recommended · — not needed
-
-| Asset | `kind` | lead | supp. | guest | narr. | costar | u/5 | bkgd |
-|-------|--------|:----:|:-----:|:-----:|:-----:|:------:|:---:|:----:|
-| CHARACTER.md, full | `description` | ✅ | ✅ | ✅ | ✅ | — | — | — |
-| CHARACTER.md, short | `description` | — | — | — | — | ✅ | ✅ | — |
-| Portrait / headshot | `portrait` | ✅ | ✅ | ✅ | ◐ | ✅ | ◐ | — |
-| Turnaround (front, ¾, side, back) | `turnaround` | ✅ | ✅ | ✅ | — | ◐ | — | — |
-| Face sheet (front, ¾, profile) | `faceSheet` | ✅ | ✅ | ◐ | — | — | — | — |
-| Expression sheet (≥ 6) | `expressions` | ✅ | ◐ | ◐ | — | — | — | — |
-| Wardrobe, one per costume | `wardrobe` | ◐ | ◐ | — | — | — | — | — |
-| Color palette | `palette` | ✅ | ✅ | ◐ | — | — | — | — |
-| Source photo(s) | `sourcePhoto` | ◐ | ◐ | ◐ | ◐ | ◐ | — | — |
-| Character LoRA | `lora` | ◐ | — | — | — | — | — | — |
-| Training set | `training` | *(with lora)* | | | | | | |
-| Crowd reference | `crowdRef` | — | — | — | — | — | — | ◐ |
-| Voice prompt | *(CAST.md)* | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| `.vox`, 1.7B | `vox` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| `.vox`, 0.6B | `vox` | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ | — |
-| Voice sample, neutral | `voiceSample` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Voice samples, range (≥ 3) | `voiceSample` | ✅ | ◐ | ◐ | ◐ | — | — | — |
-| Pronunciation guide | *(CHARACTER.md)* | ✅ | ✅ | ◐ | ✅ | — | — | — |
-| Dossier | `dossier` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-
-- **Voice samples are `.m4a` renders** of fixed sample text, made from the
-  `.vox`. The dossier must play something, and browsers can't play `.vox`.
-  The default range set is neutral, angry, quiet and joyful.
-- **Complete** means every ✅ for the tier exists as a `selected` asset. The
-  table is data in the library (`RoleTier.requirements`), not prose that
-  apps re-implement.
-
-### 5.5 CHARACTER.md
-
-This is the written half of the record: front matter for facts, and a body
-for prose.
-
-```markdown
----
-type: character
-character: THE PRACTITIONER     # must equal CAST.md exactly
-role: supporting
-age: "40s"
-pronouns: she/her
-occupation: …
----
-## Logline
-## Appearance
-## Personality
-## Backstory
-## Arc
-## Relationships
-## Voice & Speech
-## Pronunciation
-## Wardrobe
-```
-
-- **Full** (major tiers) has every section. **Short** (`costar`,
-  `underfive`) has Logline, Appearance, and Voice & Speech.
-- In `## Relationships`, other characters are referred to by their exact
-  UPPERCASE name, so the dossier can link to them.
-- The CAST.md body keeps its one-paragraph summaries (Reparto D5). CHARACTER.md
-  is the long form.
-- Unknown front-matter keys are preserved, following SwiftProyecto's
-  app-section pattern.
-
-### 5.6 The dossier
-
-`characters/<CHARACTER>/dossier.html` is the presentation of a complete
-character: every selected asset on one page, with a playable voice. The
-**format and renderer are defined here** (`DossierRenderer`), so every app
-produces and reads the same page.
-
-**Properties:**
-
-- **Generated, never hand-edited.** It's rendered from the CAST.md member,
-  CHARACTER.md and the manifest. It's registered as `kind: dossier` with
-  `derivedFrom` hashes of its inputs, so a stale dossier can be detected.
-- **Self-contained and offline.** It's a single file with inline CSS and
-  minimal inline JS. There are no network requests, web fonts or CDNs. It
-  links to assets by relative, percent-encoded path, so it works over
-  `file://` and inside a zip.
-- **Audio** uses native `<audio>` pointing at `voice/*.m4a`. Playback is
-  click-only, never autoplay.
-- **Accessible:** light and dark mode (`prefers-color-scheme`), a print
-  stylesheet (players hidden, sample text shown), and usable at phone width.
-- **Machine-readable too.** The page embeds the record as
-  `<script type="application/json" id="character-record">`, so tools that
-  only have the HTML can still read it.
-
-**Layout:**
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│ [portrait]  THE PRACTITIONER                   Supporting    │
-│             "Logline."   Played by: …   ▶ Hear the voice     │
-├──────────────────────────────────────────────────────────────┤
-│ Facts: age · pronouns · occupation · height · language        │
-├──────────────────────────────────────────────────────────────┤
-│ LOOK  [ turnaround, full width ]                              │
-│       [ face sheet ] [ expressions ]  Wardrobe · Palette ■■■■ │
-├──────────────────────────────────────────────────────────────┤
-│ VOICE  voicePrompt · ▶ neutral ▶ angry ▶ quiet ▶ joyful       │
-│        models: 1.7B ✓ 0.6B ✓ · pronunciation                  │
-├──────────────────────────────────────────────────────────────┤
-│ STORY  personality · backstory · arc · relationships (links)  │
-├──────────────────────────────────────────────────────────────┤
-│ COMPLETENESS  supporting: 10/10 required ✓ · suggestions: …   │
-├──────────────────────────────────────────────────────────────┤
-│ ▸ Provenance: per-asset provider/model/prompt/date · LoRA      │
-│   trigger word · manifest checksum · generator version        │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Content rules:**
-
-- Only `selected` assets are shown. Candidate and rejected assets appear as
-  counts under Provenance.
-- Missing ✅ items are listed by name. ◐ items appear as suggestions.
-- Relationships link to `../<OTHER CHARACTER>/dossier.html`, but only when
-  that member exists in CAST.md and has a dossier.
-- Integrity problems (missing files, hash mismatches, stale selections, or a
-  name mismatch) appear as a banner at the top.
-
-**Cast index:** `characters/index.html` is generated from CAST.md order. It
-shows each member's portrait, name, tier and ▶ voice, grouped Major / Minor,
-with links to the dossiers.
-
-### 5.7 Verification
-
-`verify` (library API and `semblanzas verify`) walks CAST.md and reports, per
-member:
-
-- a missing or invalid `manifest:`
-- a name mismatch (§5.2)
-- files that are missing, modified (by hash) or unclassified
-- a stale dossier
-- completeness against the tier
-
-It also reports orphan directories. It never modifies anything. The
-`.acervo-verified.json` marker pattern may be reused to skip re-hashing.
-
-### 5.8 Library shape
-
-| Target | Depends on | Contains |
-|--------|------------|----------|
-| **`SemblanzasRecord`** | Foundation, CryptoKit, SwiftReparto | `CharacterRecord` (load a member via CAST.md), `CharacterManifest` + writer, `AssetKind`, `RoleTier` + requirements, `CharacterDescription` (CHARACTER.md), `DossierRenderer`, `CastIndexRenderer`, `Verifier` |
-| **`SwiftSemblanzas`** | `SemblanzasRecord`, Flux2Core, SwiftAcervo | Training, sequence generation, QA (§3) |
-| **`semblanzas`** CLI | both | `verify`, `manifest refresh`, `dossier`, `train`, `sequence` |
-
-Personaje, Produciesta and Vinetas link **`SemblanzasRecord`** only, unless
-they train.
+- **Reads** (through SwiftDossier `DossierCore`): the member via `CAST.md`,
+  `sourcePhoto` assets, the selected `portrait`, `face` and `view` assets as
+  synthetic-view candidates, `prompts.identity`, and CHARACTER.md Appearance.
+- **Writes** (through SwiftDossier `Dossier`): `training` and `lora` assets.
+- **Never writes** `CAST.md` (SwiftReparto's) or Reparto's deprecated
+  `appearance:` block (RQ-25).
 
 ---
 
@@ -600,7 +269,7 @@ they train.
 
 | Phase | Deliverable | Key new work |
 |---|---|---|
-| **0** | The character record (§5), needed first by Personaje | `SemblanzasRecord` target: naming, CAST.md discovery, manifest read/write/verify, tier requirements, CHARACTER.md, dossier + cast-index renderers; `semblanzas verify` / `manifest refresh` / `dossier` |
+| **0** | ~~The character record~~ | *Moved 2026-10-19:* the format is dossier-format, the library is SwiftDossier. No `SemblanzasRecord` target. |
 | **1** | Single character → 3-panel sequence | SwiftData catalog; un-stub training → `Flux2Core`; sequence render; DINOv2 QA gate; CLI |
 | **2** | Multi-character scenes ("Dan and Rick talk") | `Convocatoria` composition type; widen engine API from one-adapter to fuse-a-cast + reload-base; cast-batched generation loop; per-entity identity QA |
 | **3** | Props | 3D-model → turntable render → captioned training set (greenfield — nothing in the collection reads 3D today); or prop-as-reference-image path |
@@ -611,10 +280,11 @@ they train.
 
 ## 8. Dependencies (provisional)
 
-- **`SwiftReparto`**: the cast list (`CAST.md`), where discovery starts (§5.2), and the only writer
-  of that file (§4.3). `SemblanzasRecord` links it. A leaf library: YAML parsing and nothing else, so it costs this package
+- **`SwiftDossier`** (`Dossier`): the character record: read the bundle,
+  register `training` and `lora` assets. **Firm.**
+- **`SwiftReparto`**: the cast list (`CAST.md`), where discovery starts, and the only writer
+  of that file (§4.3). Linked through SwiftDossier. A leaf library: YAML parsing and nothing else, so it costs this package
   nothing to link. **Firm, not provisional.**
-- `CryptoKit`: manifest hashing (§5.3). The record target needs nothing heavier.
 - `flux-2-swift-mlx` (`Flux2Core`): training and inference. **Primary** for the `SwiftSemblanzas` target.
 - `SwiftAcervo` — model discovery/download/cache.
 - `SwiftVinetas` — reuse Understanding (DINOv2) + storyboard orchestration, or
@@ -640,7 +310,7 @@ they train.
    regeneration attempts per panel.
 5. **Base-model default.** Klein-4B-Base (16 GB friendly) vs 9B/Dev quality
    for the reference training config.
-6. **SwiftReparto fields (§5.2).** *Drafted* in SwiftReparto
+6. **SwiftReparto fields (dossier-format).** *Drafted* in SwiftReparto
    `REQUIREMENTS.md` (target 0.2.0): `role` (RQ-19), `manifest` (RQ-20), the
    string-only manifest/name check (RQ-21), and canonical names (RQ-22).
    Phase 0 depends on it.
@@ -658,9 +328,10 @@ they train.
    SwiftEchada reads manifests (SwiftEchada EC-Q2).
 9. **Vinetas' character store.** Vinetas keeps characters in
    `~/Library/SwiftVinetas/characters/<slug>/` with `character.yaml`. Should
-   it adopt the record (§5), or stay a private cache? Recommendation: in a
-   production, Vinetas reads characters via `SemblanzasRecord`, and its
-   `~/Library` store becomes a cache only.
+   it adopt the record, or stay a private cache? *Decided:* in a production,
+   Vinetas reads characters through SwiftDossier `DossierCore`, and its
+   `~/Library` store becomes a cache only; a dossier's `lora.triggerWord`
+   overrides the store's slug default (dossier-format D7).
 
 ---
 
